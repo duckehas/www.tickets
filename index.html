@@ -1,0 +1,207 @@
+<!-- =====================
+ FUTURISTIC DISCORD-STYLE TICKET SYSTEM WITH IMAGE UPLOAD, ADVANCED BLIZZARD SNOW, SECURITY
+ USER PAGE: index.html
+===================== -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Discord Ticket Support</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+:root{
+  --glass: rgba(255,255,255,0.12);
+  --border: rgba(255,255,255,.25);
+  --blue: #38bdf8;
+  --purple: #818cf8;
+  --bg: #020617;
+}
+*{box-sizing:border-box;font-family:'Segoe UI',system-ui}
+body{margin:0;background:#020617;overflow:hidden;color:white}
+canvas{position:fixed;inset:0;z-index:0}
+#tabBar{position:fixed;top:0;left:0;width:100%;background:rgba(20,20,30,0.9);display:flex;gap:6px;padding:6px;z-index:2;overflow-x:auto}
+.tabButton{padding:6px 12px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#6366f1);color:white;cursor:pointer;white-space:nowrap;transition:transform .2s, box-shadow .2s;}
+.tabButton:hover{transform:scale(1.05);box-shadow:0 0 20px rgba(168,85,247,.7);}
+.wrap{position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding-top:50px}
+.panel{width:620px;border-radius:26px;background:linear-gradient(135deg,rgba(148,163,184,.22),rgba(148,163,184,.12));backdrop-filter:blur(22px);border:1px solid var(--border);box-shadow:0 40px 80px rgba(0,0,0,.6);padding:34px}
+h1{margin:0 0 16px;font-size:1.9rem;letter-spacing:.5px}
+label{font-size:.8rem;opacity:.8}
+input,textarea{width:100%;padding:14px 16px;border-radius:16px;background:var(--glass);border:1px solid var(--border);color:white;margin-bottom:14px}
+textarea{min-height:120px;resize:none}
+button{padding:14px 22px;border-radius:999px;border:none;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#a855f7,#6366f1);color:white;box-shadow:0 0 30px rgba(168,85,247,.6);transition:transform .25s ease, box-shadow .25s ease, filter .25s ease}
+button:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 0 55px rgba(168,85,247,.85);filter:brightness(1.1)}
+button:active{transform:scale(.97)}
+.chat{height:360px;border-radius:22px;background:rgba(0,0,0,.25);padding:16px;overflow-y:auto;margin-bottom:14px}
+.bubble{max-width:80%;padding:12px 16px;border-radius:18px;margin-bottom:10px;font-size:.9rem;line-height:1.4;animation:pop .35s ease forwards;opacity:0;transform:translateY(8px)}
+@keyframes pop{to{opacity:1;transform:translateY(0)}}
+.userBubble{background:linear-gradient(135deg,#38bdf8,#818cf8);color:#020617;margin-left:auto}
+.adminBubble{background:rgba(255,255,255,.18);border:1px solid var(--border)}
+.controls{display:flex;gap:12px}
+.close{background:transparent;color:#f87171;border:1px solid #f87171;box-shadow:none}
+img.chatImage{max-width:200px;border-radius:12px;margin-top:6px;display:block}
+</style>
+</head>
+<body>
+<canvas id="snow"></canvas>
+<div id="tabBar"></div>
+<div class="wrap">
+<div class="panel" id="create">
+<h1>Create Support Ticket</h1>
+<label>Discord Username</label>
+<input id="name" placeholder="username#1234">
+<label>Discord ID</label>
+<input id="email" placeholder="123456789012345678">
+<label>Issue</label>
+<textarea id="issue"></textarea>
+<button onclick="startTicket()">Create Ticket</button>
+</div>
+<div class="panel" id="chat" style="display:none">
+<h1>Live Support Channel</h1>
+<div class="chat" id="chatBox"></div>
+<input id="msg" placeholder="Transmit message">
+<input type="file" id="imgUpload" accept="image/*">
+<div class="controls">
+<button onclick="sendMsg()">Send</button>
+<button class="close" onclick="closeTicket()">Close Channel</button>
+</div>
+</div>
+</div>
+
+<script>
+let ticketId=null;
+
+function updateTabBar(){
+  const tabBar=document.getElementById('tabBar');
+  tabBar.innerHTML='';
+  Object.keys(localStorage).filter(k=>k.startsWith('ticket_')).forEach(key=>{
+    const t=JSON.parse(localStorage[key]);
+    if(!t.closed){
+      const btn=document.createElement('button');
+      btn.className='tabButton';
+      btn.innerText=`${t.discord} - ${t.id}`;
+      btn.onclick=()=>{
+        ticketId=t.id;
+        document.getElementById('create').style.display='none';
+        document.getElementById('chat').style.display='block';
+        render();
+      };
+      tabBar.appendChild(btn);
+    }
+  });
+}
+
+function startTicket(){
+  const discord=document.getElementById('name').value.trim();
+  const discordId=document.getElementById('email').value.trim();
+  const issueText=document.getElementById('issue').value.trim();
+  if(!discord||!discordId||!issueText){alert('Fill out all fields');return;}
+  ticketId='TCK-'+Math.floor(Math.random()*900000);
+  const ticket={
+    id:ticketId,
+    discord:discord,
+    discordId:discordId,
+    closed:false,
+    messages:[{from:discord,text:issueText,time:new Date().toLocaleString()}]
+  };
+  localStorage.setItem('ticket_'+ticketId,JSON.stringify(ticket));
+  document.getElementById('create').style.display='none';
+  document.getElementById('chat').style.display='block';
+  render();
+  updateTabBar();
+}
+
+function sendMsg(){
+  const msgInput=document.getElementById('msg');
+  const text=msgInput.value.trim();
+  const fileInput=document.getElementById('imgUpload');
+  if(!text&&!fileInput.files.length)return;
+  const ticket=JSON.parse(localStorage.getItem('ticket_'+ticketId));
+  if(ticket.closed)return;
+
+  if(text){ticket.messages.push({from:ticket.discord,text:text,time:new Date().toLocaleString()});}
+
+  if(fileInput.files.length){
+    const reader=new FileReader();
+    reader.onload=function(e){
+      ticket.messages.push({from:ticket.discord,img:e.target.result,time:new Date().toLocaleString()});
+      localStorage.setItem('ticket_'+ticketId,JSON.stringify(ticket));
+      render();
+      fileInput.value='';
+    };
+    reader.readAsDataURL(fileInput.files[0]);
+  }else{
+    localStorage.setItem('ticket_'+ticketId,JSON.stringify(ticket));
+    render();
+  }
+  msgInput.value='';
+}
+
+function closeTicket(){
+  const ticket=JSON.parse(localStorage.getItem('ticket_'+ticketId));
+  ticket.closed=true;
+  ticket.closedAt=new Date().toLocaleString();
+  localStorage.setItem('ticket_'+ticketId,JSON.stringify(ticket));
+  document.getElementById('chat').style.display='none';
+  document.getElementById('create').style.display='block';
+  updateTabBar();
+}
+
+function render(){
+  const ticket=JSON.parse(localStorage.getItem('ticket_'+ticketId));
+  const chatBox=document.getElementById('chatBox');
+  chatBox.innerHTML='';
+  ticket.messages.forEach(m=>{
+    const div=document.createElement('div');
+    div.className='bubble '+(m.from===ticket.discord?'userBubble':'adminBubble');
+    if(m.text) div.innerHTML=`<b>${m.from}:</b> ${m.text}<br><small>${m.time}</small>`;
+    if(m.img){
+      const img=document.createElement('img');
+      img.src=m.img;
+      img.className='chatImage';
+      div.appendChild(img);
+      const time=document.createElement('div');
+      time.innerHTML=`<small>${m.time}</small>`;
+      div.appendChild(time);
+    }
+    chatBox.appendChild(div);
+  });
+  requestAnimationFrame(()=>chatBox.scrollTop=chatBox.scrollHeight);
+}
+
+updateTabBar();
+
+// Security: disable right click, F12, back, and context menu
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+  if(e.key==='F12' || (e.ctrlKey && (e.key==='u' || e.key==='s' || e.key==='Shift' || e.key==='i'))){ e.preventDefault(); }
+});
+window.history.pushState(null, null, window.location.href);
+window.onpopstate=function(){window.history.go(1);};
+</script>
+
+<script>
+// Blizzard-like live snow effect
+const c=document.getElementById('snow');
+const ctx=c.getContext('2d');
+let w,h,snow=[];
+function resize(){w=c.width=innerWidth;h=c.height=innerHeight;}
+resize();window.onresize=resize;
+for(let i=0;i<500;i++)snow.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*4+1,d:Math.random()*2+0.5,dx:(Math.random()-0.5)*1});
+function drawSnow(){
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle='rgba(255,255,255,.85)';
+  ctx.beginPath();
+  snow.forEach(s=>{
+    ctx.moveTo(s.x,s.y);ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    s.y+=s.d*s.d+0.5;
+    s.x+=s.dx;
+    if(s.y>h){s.y=-10;s.x=Math.random()*w;}
+    if(s.x>w)s.x=0;if(s.x<0)s.x=w;
+  });
+  ctx.fill();
+  requestAnimationFrame(drawSnow);
+}
+drawSnow();
+</script>
+</body>
+</html>
